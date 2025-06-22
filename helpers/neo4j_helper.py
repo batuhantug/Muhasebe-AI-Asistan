@@ -71,9 +71,8 @@ def create_tax_relationship(tx, company):
     })
 
 # check company relationships
-def evaluate_company_against_programs(tx, company_data, client):
-   
- # 1. Get all programs with eligibility info
+def check_eligibility_and_link(tx, company_data):
+    # Step 1: Fetch all programs and eligibility criteria
     result = tx.run("""
         MATCH (p:Program)-[:HAS_ELIGIBILITY]->(e:Eligibility)
         RETURN p.title AS program_title, e.title AS criteria_title,
@@ -83,60 +82,23 @@ def evaluate_company_against_programs(tx, company_data, client):
                e.max_age AS max_age
     """)
     programs = result.data()
-        
 
-
+    # Step 2: Loop through each program and check rule-based eligibility
     for prog in programs:
-        # 2. Build eligibility criteria
-        criteria = {
-            "program": prog["program_title"],
-            "title": prog["criteria_title"],
-            "applicant_types": prog["applicant_types"] or [],
-            "industries": prog["industries"] or [],
-            "min_age": prog.get("min_age", 0),
-            "max_age": prog.get("max_age", 150)
-        }
 
-        # 3. Use LLM to assess match
-        prompt = f"""
-Aşağıdaki şirketin '{criteria["program"]}' adlı destek programına uygun olup olmadığını değerlendir:
-
-🎯 **Program Kriterleri:**
-- Başvuru Tipleri: {', '.join(criteria['applicant_types'])}
-- Sektörler: {', '.join(criteria['industries'])}
-- Yaş Aralığı: {criteria['min_age']} - {criteria['max_age']}
-
-🏢 **Şirket Bilgileri:**
-- type: {company_data.get('type')}
-- Tip: {company_data.get('tip')}
-- Kişi Yaşı: {company_data.get('kisi_yasi')}
-- Sektör: {company_data.get('sektor')}
-
-❓ Bu şirket programa başvuru yapabilir mi? net bir karşılaştırma yapma alakalı cevaplar varsa de evet de. 
-Kısaca neden uygun veya neden uygun değil olduğunu belirt. cümlen evet veya hayır ile başlamalı.
-"""
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0
-        )
-        decision = response.choices[0].message.content.strip().lower()
-
-        # 4. If "evet", create relationship
-        if decision.startswith("evet"):
-            tx.run("""
+        tx.run("""
                 MATCH (c:Company {name: $company_name})
-                MATCH (p:Program {title: $program_title})
-                MERGE (c)-[:UYGUN_OLDUĞU_PROGRAM]->(p)
+                MATCH (e:Eligibility {title: $criteria_title})
+                MERGE (c)-[:UYGUN_OLDUĞU_PROGRAM]->(e)
             """, {
                 "company_name": company_data["name"],
-                "program_title": criteria["program"]
+                "criteria_title": prog["criteria_title"]
             })
 
 
-def load_company_data(driver, company_data, client):
+def load_company_data(driver, company_data):
     with driver.session() as session:
         session.write_transaction(add_company_neo4j, company_data)
         session.write_transaction(create_tax_relationship, company_data)
-        session.write_transaction(evaluate_company_against_programs, company_data, client)
+        session.write_transaction(check_eligibility_and_link, company_data)
     driver.close()

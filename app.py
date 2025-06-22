@@ -707,7 +707,7 @@ elif sidebar_option == "Add Company":
         
         with st.spinner("Adding company to database..."):
             try:
-                load_company_data(driver, company_data, client=llm)
+                load_company_data(driver, company_data)
                 st.sidebar.success("Company added successfully!")
             except Exception as e:
                 st.sidebar.error(f"Error adding company: {str(e)}")
