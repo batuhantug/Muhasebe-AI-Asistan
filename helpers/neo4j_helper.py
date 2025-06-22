@@ -71,19 +71,20 @@ def create_tax_relationship(tx, company):
     })
 
 # check company relationships
-def evaluate_company_against_programs(driver, company_data, client):
-    with driver.session() as session:
-        # 1. Get all programs with eligibility info
-        result = session.run("""
-            MATCH (p:Program)-[:HAS_ELIGIBILITY]->(e:Eligibility)
-            RETURN p.title AS program_title, e.title AS criteria_title,
-                   e.applicant_types AS applicant_types,
-                   e.industries AS industries,
-                   e.min_age AS min_age,
-                   e.max_age AS max_age
-        """)
+def evaluate_company_against_programs(tx, company_data, client):
+   
+ # 1. Get all programs with eligibility info
+    result = tx.run("""
+        MATCH (p:Program)-[:HAS_ELIGIBILITY]->(e:Eligibility)
+        RETURN p.title AS program_title, e.title AS criteria_title,
+               e.applicant_types AS applicant_types,
+               e.industries AS industries,
+               e.min_age AS min_age,
+               e.max_age AS max_age
+    """)
+    programs = result.data()
         
-        programs = result.data()
+
 
     for prog in programs:
         # 2. Build eligibility criteria
@@ -106,7 +107,7 @@ Aşağıdaki şirketin '{criteria["program"]}' adlı destek programına uygun ol
 - Yaş Aralığı: {criteria['min_age']} - {criteria['max_age']}
 
 🏢 **Şirket Bilgileri:**
-- Statü: {company_data.get('statü')}
+- type: {company_data.get('type')}
 - Tip: {company_data.get('tip')}
 - Kişi Yaşı: {company_data.get('kisi_yasi')}
 - Sektör: {company_data.get('sektor')}
@@ -123,15 +124,14 @@ Kısaca neden uygun veya neden uygun değil olduğunu belirt. cümlen evet veya 
 
         # 4. If "evet", create relationship
         if decision.startswith("evet"):
-            with driver.session() as session:
-                session.run("""
-                    MATCH (c:Company {name: $company_name})
-                    MATCH (p:Program {title: $program_title})
-                    MERGE (c)-[:UYGUN_OLDUĞU_PROGRAM]->(p)
-                """, {
-                    "company_name": company_data["name"],
-                    "program_title": criteria["program"]
-                })
+            tx.run("""
+                MATCH (c:Company {name: $company_name})
+                MATCH (p:Program {title: $program_title})
+                MERGE (c)-[:UYGUN_OLDUĞU_PROGRAM]->(p)
+            """, {
+                "company_name": company_data["name"],
+                "program_title": criteria["program"]
+            })
 
 
 def load_company_data(driver, company_data, client):
