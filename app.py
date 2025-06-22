@@ -16,6 +16,11 @@ from langchain.prompts import PromptTemplate
 from helpers.llm import check_company_eligibility
 from helpers.llm import llm
 
+from langchain_community.graphs import Neo4jGraph
+from langchain.chat_models import ChatOpenAI
+from langchain_community.chains import GraphCypherQAChain
+
+
 
 llm = llm()
 
@@ -38,137 +43,6 @@ def get_llm_conditions(query):
     # For now, return default conditions
     return CUSTOM_CONDITIONS["default"]
 
-
-def is_kosgeb_related(query):
-    system_prompt = (
-        "Sen bir sınıflandırma asistanısın. Kullanıcının sorusunun KOSGEB destekleri, hibeleri, teşvikleriyle ilgili olup olmadığını değerlendir.\n"
-        "Sadece 'Evet' veya 'Hayır' olarak yanıt ver."
-    )
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": query}
-    ]
-
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages
-    )
-
-    answer = response.choices[0].message.content.strip().lower()
-
-    return answer.startswith("evet")
-
-def is_tax_related(query):
-    system_prompt = (
-        "Sen bir sınıflandırma asistanısın. Kullanıcının sorusunun Vergi kanunları ile ilgili olup olmadığını değerlendir.\n"
-        "Sadece 'Evet' veya 'Hayır' olarak yanıt ver."
-    )
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": query}
-    ]
-
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages
-    )
-
-    answer = response.choices[0].message.content.strip().lower()
-
-    return answer.startswith("evet")
-
-def if_it_start_with_company(query, llm_instance):
-    """
-    Use LLM to check if the query starts with a company name and return the company name if found.
-    """
-    prompt_template = PromptTemplate(
-        input_variables=["query"],
-        template="""
-        Aşağıdaki sorunun başında şirket ismi var mı kontrol et.
-        Eğer başında şirket ismi varsa, sadece şirket ismini yaz.
-        Eğer başında şirket ismi yoksa 'YOK' yaz.
-        Sadece şirket ismini veya 'YOK' yaz, başka bir şey yazma.
-
-        Örnekler:
-        "ABC şirketi hakkında bilgi ver" -> "ABC"
-        "XYZ firmasının cirosu nedir" -> "XYZ"
-        "DEF Ltd. Şti. hakkında" -> "DEF"
-        "GHI A.Ş. ile ilgili" -> "GHI"
-        "Vergi hakkında bilgi ver" -> "YOK"
-        "Şirketler hakkında" -> "YOK"
-
-        Soru: {query}
-        """
-    )
-    
-    formatted_prompt = prompt_template.format(query=query)
-    response = llm_instance.invoke(formatted_prompt).content.strip()
-    
-    return None if response.upper() == "YOK" else response
-
-def extract_company_name(query, llm_instance):
-    """
-    Use LLM to extract company name from the query.
-    """
-    prompt_template = PromptTemplate(
-        input_variables=["query"],
-        template="""
-        Aşağıdaki sorudan şirket ismini çıkar. Eğer şirket ismi yoksa 'YOK' yaz.
-        Sadece şirket ismini veya 'YOK' yaz, başka bir şey yazma.
-
-        Soru: {query}
-        """
-    )
-    
-    formatted_prompt = prompt_template.format(query=query)
-    response = llm_instance.invoke(formatted_prompt).content.strip()
-    
-    return None if response.upper() == "YOK" else response
-
-def get_company_relationships(driver, company_name):
-    """
-    Get all relationships and related information for a company.
-    """
-    with driver.session() as session:
-        # First try exact match
-        result = session.run("""
-        MATCH (c:Company)
-        WHERE c.name = $company_name
-        OPTIONAL MATCH (c)-[r]->(related)
-        OPTIONAL MATCH (c)-[:IN_SECTOR]->(s:Sector)
-        OPTIONAL MATCH (c)-[:HAS_ANNUAL_REVENUE]->(ar:AnnualRevenue)
-        RETURN c.name as name,
-               c.statu as statu,
-               c.yas as yas,
-               s.name as sector,
-               collect(distinct {type: type(r), related: related.name}) as relationships,
-               collect(distinct {year: ar.year, revenue: ar.revenue}) as revenues
-        """, company_name=company_name)
-        
-        company_data = result.single()
-        
-        # If no exact match, try fuzzy search
-        if not company_data:
-            result = session.run("""
-            MATCH (c:Company)
-            WHERE c.name CONTAINS $company_name
-            OPTIONAL MATCH (c)-[r]->(related)
-            OPTIONAL MATCH (c)-[:IN_SECTOR]->(s:Sector)
-            OPTIONAL MATCH (c)-[:HAS_ANNUAL_REVENUE]->(ar:AnnualRevenue)
-            RETURN c.name as name,
-                   c.statu as statu,
-                   c.yas as yas,
-                   s.name as sector,
-                   collect(distinct {type: type(r), related: related.name}) as relationships,
-                   collect(distinct {year: ar.year, revenue: ar.revenue}) as revenues
-            LIMIT 1
-            """, company_name=company_name)
-            company_data = result.single()
-        
-        return company_data
-
 # Initialize memory
 def initialize_memory():
     return ConversationBufferMemory(
@@ -189,6 +63,15 @@ client = OpenAI(
 embedding_model = OpenAIEmbeddings (model="text-embedding-3-small", openai_api_key=openai_api_key)
 # Initialize Neo4j driver (IMPORTANT: you forgot this part)
 driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, neo4j_password))
+
+graph = Neo4jGraph(
+    url="bolt://localhost:7687",
+    username="neo4j",
+    password="your_password",
+)
+
+
+
 
 def is_database_empty(driver):
     with driver.session() as session:
@@ -296,282 +179,17 @@ if prompt := st.chat_input("Bana kosgeb destekleri ve vergiler ile ilgili istedi
     # Display assistant response
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
+            
             try:
-                # Check if query contains a company name and KOSGEB support question
-                query_lower = prompt.lower()
-                is_kosgeb_related = is_kosgeb_related(query_lower)
-                
-                # Initialize response variable
-                response = None
-                
-                # Get LLM instance
-                llm_instance, system_prompt = get_llm(
-                    model_name="gpt-4o-mini",
-                    style="professional",
-                    query=prompt
+                chain = GraphCypherQAChain.from_llm(
+                    graph=graph,
+                    cypher_llm=ChatOpenAI(temperature=0, model="gpt-4o-mini"),
+                    qa_llm=ChatOpenAI(temperature=0, model="gpt-4o-mini"),
+                    verbose=True,
+                    allow_dangerous_requests=False,  # allows queries that may modify data - use with caution
                 )
-                
-                # Check if query starts with company name
-                company_name = if_it_start_with_company(prompt, llm_instance)
-                if company_name:
-                    # Get company relationships
-                    company_data = get_company_relationships(driver, company_name)
-                    if not company_data:
-                        response = f"{company_name} şirketi veritabanında bulunamadı."
-                    else:
-                        # Create a prompt template for company analysis
-                        prompt_template = PromptTemplate(
-                            input_variables=["company_data", "question"],
-                            template="""
-                            Sen bir muhasebe ve vergi uzmanısın. Aşağıdaki şirket bilgilerini analiz ederek soruyu yanıtla.
 
-                            Şirket Bilgileri:
-                            - İsim: {company_data[name]}
-                            - Statü: {company_data[statu]}
-                            - Yaş: {company_data[yas]}
-                            - Sektör: {company_data[sector]}
-
-                            İlişkiler:
-                            {relationships}
-
-                            Yıllık Ciro Bilgileri:
-                            {revenues}
-
-                            Soru: {question}
-
-                            Lütfen verilen bilgilere dayanarak detaylı bir analiz yap. 
-                            Özellikle:
-                            1. Şirketin sektördeki konumunu değerlendir
-                            2. Finansal performansını analiz et
-                            3. İlişkilerini ve bağlantılarını açıkla
-                            4. Varsa, potansiyel riskleri ve fırsatları belirt
-                            """
-                        )
-                        
-                        # Format relationships
-                        relationships_text = "\n".join([
-                            f"- {rel['type']}: {rel['related']}"
-                            for rel in company_data['relationships']
-                        ]) if company_data['relationships'] else "İlişki bulunamadı"
-                        
-                        # Format revenues
-                        revenues_text = "\n".join([
-                            f"- {rev['year']}: {rev['revenue']} TL"
-                            for rev in company_data['revenues']
-                        ]) if company_data['revenues'] else "Ciro bilgisi bulunamadı"
-                        
-                        # Format the prompt
-                        formatted_prompt = prompt_template.format(
-                            company_data=company_data,
-                            question=prompt,
-                            relationships=relationships_text,
-                            revenues=revenues_text
-                        )
-                        
-                        # Get response from LLM
-                        response = llm_instance.invoke(formatted_prompt).content
-                
-                if is_kosgeb_related:
-                    # Search in KOSGEB vector database
-                    index_info = {
-                        "index_name": "kosgeb_vector_index",
-                        "label": "Chunk"
-                    }
-                    st.sidebar.info(f"Searching in {index_info['index_name']} for {index_info['label']} nodes...")
-                    
-                    # Search vector database for relevant documents
-                    relevant_docs = search_vector_db(driver, prompt, embedding_model)
-                    
-                    if not relevant_docs:
-                        response = "Üzgünüm, KOSGEB destekleri hakkında yeterli bilgi bulamadım. Lütfen önce bazı KOSGEB dokümanları yükleyin."
-                    else:
-                        # Create a prompt template that includes the retrieved documents
-                        prompt_template = PromptTemplate(
-                            input_variables=["question", "context"],
-                            template="""
-                            Sen bir KOSGEB uzmanısın. Aşağıdaki bağlamı kullanarak soruyu yanıtla.
-
-                            Bağlam:
-                            {context}
-
-                            Soru: {question}
-
-                            Lütfen verilen bağlama dayanarak net ve doğru bir yanıt ver. 
-                            Eğer bir konudan emin değilsen veya bağlamda ilgili bilgi yoksa, bunu belirt.
-                            Yanıtını Türkçe olarak ver ve mümkün olduğunca detaylı açıkla."""
-                        )
-                        
-                        # Format the context from retrieved documents
-                        context = "\n\n".join([
-                            f"Belge {i+1} (İlgi: {doc['score']:.2f}):\n"
-                            f"Başlık: {doc['title']}\n"
-                            f"Kategori: {doc['category']}\n"
-                            f"İçerik: {doc['text']}"
-                            for i, doc in enumerate(relevant_docs)
-                        ])
-                        
-                        # Format the prompt
-                        formatted_prompt = prompt_template.format(
-                            question=prompt,
-                            context=context
-                        )
-                        
-                        # Get response from LLM
-                        response = llm_instance.invoke(formatted_prompt).content
-                
-
-                is_tax_related = is_tax_related(query_lower)
-
-                if is_tax_related:
-                    # Search in tax law vector database
-                    index_info = {
-                        "index_name": "tax_law_vector_index",
-                        "label": "Article"
-                    }
-                    st.sidebar.info(f"Searching in {index_info['index_name']} for {index_info['label']} nodes...")
-                    
-                    # Search vector database for relevant documents with relationships
-                    with driver.session() as session:
-                        # Get query embedding
-                        query_embedding = embedding_model.embed_query(prompt)
-                        
-                        # Search with relationships
-                        result = session.run("""
-                        CALL db.index.vector.queryNodes('tax_law_vector_index', $k, $embedding)
-                        YIELD node, score
-                        WITH node, score
-                        OPTIONAL MATCH (node)-[r]->(related)
-                        RETURN node.content as text, score, node.category as category, 
-                               node.title as title,
-                               collect(distinct {type: type(r), related: related.title}) as relationships
-                        ORDER BY score DESC
-                        LIMIT $limit
-                        """, 
-                        k=5,
-                        embedding=query_embedding,
-                        limit=5
-                        )
-                        
-                        relevant_docs = []
-                        for record in result:
-                            if record["text"]:
-                                relevant_docs.append({
-                                    "text": record["text"],
-                                    "score": record["score"],
-                                    "category": record["category"],
-                                    "title": record["title"],
-                                    "relationships": record["relationships"]
-                                })
-                    
-                    if not relevant_docs:
-                        response = "Üzgünüm, vergi kanunları hakkında yeterli bilgi bulamadım. Lütfen önce vergi kanunları yükleyin."
-                    else:
-                        # Create a prompt template that includes the retrieved documents and relationships
-                        prompt_template = PromptTemplate(
-                            input_variables=["question", "context"],
-                            template="""
-                            Sen bir vergi uzmanısın. Aşağıdaki bağlamı kullanarak soruyu yanıtla.
-
-                            Bağlam:
-                            {context}
-
-                            Soru: {question}
-
-                            Lütfen verilen bağlama dayanarak net ve doğru bir yanıt ver. 
-                            Eğer bir konudan emin değilsen veya bağlamda ilgili bilgi yoksa, bunu belirt.
-                            Yanıtını Türkçe olarak ver ve mümkün olduğunca detaylı açıkla.
-                            Özellikle:
-                            1. İlgili vergi kanunu maddelerini ve yönetmelikleri belirt
-                            2. İlgili maddelerin birbiriyle olan ilişkilerini açıkla
-                            3. Varsa, ilgili yönetmelik ve tebliğleri belirt"""
-                        )
-                        
-                        # Format the context from retrieved documents with relationships
-                        context = "\n\n".join([
-                            f"Belge {i+1} (İlgi: {doc['score']:.2f}):\n"
-                            f"Başlık: {doc['title']}\n"
-                            f"Kategori: {doc['category']}\n"
-                            f"İçerik: {doc['text']}\n"
-                            f"İlişkiler:\n" + "\n".join([
-                                f"- {rel['type']}: {rel['related']}"
-                                for rel in doc['relationships']
-                            ])
-                            for i, doc in enumerate(relevant_docs)
-                        ])
-                        
-                        # Format the prompt
-                        formatted_prompt = prompt_template.format(
-                            question=prompt,
-                            context=context
-                        )
-                        
-                        # Get response from LLM
-                        response = llm_instance.invoke(formatted_prompt).content
-
-                # If no response was generated, use default search
-                if response is None:
-                    # Determine which vector index to use based on the query
-                    index_info = determine_vector_index(prompt)
-                    st.sidebar.info(f"Searching in {index_info['index_name']} for {index_info['label']} nodes...")
-                    
-                    # Search vector database for relevant documents
-                    relevant_docs = search_vector_db(driver, prompt, embedding_model)
-                    
-                    # Get LLM instance with custom conditions
-                    llm_instance, system_prompt = get_llm(
-                        model_name="gpt-4o-mini",
-                        style="professional",
-                        query=prompt
-                    )
-                    
-                    # Create a prompt template that includes the retrieved documents and chat history
-                    prompt_template = PromptTemplate(
-                        input_variables=["question", "context", "chat_history"],
-                        template=f"""{system_prompt}
-
-                        Önceki Konuşma:
-                        {{chat_history}}
-
-                        Bağlam:
-                        {{context}}
-
-                        Soru: {{question}}
-
-                        Lütfen verilen bağlama ve konuşma geçmişine dayanarak net ve doğru bir yanıt ver. 
-                        Eğer bir konudan emin değilsen veya bağlamda ilgili bilgi yoksa, bunu belirt.
-                        Yanıtını Türkçe olarak ver ve mümkün olduğunca detaylı açıkla."""
-                    )
-                    
-                    if not relevant_docs:
-                        response = "Üzgünüm, veritabanında sorunuzu yanıtlamak için yeterli bilgi bulamadım. Lütfen önce bazı dokümanlar yükleyin veya sorunuzu yeniden ifade edin."
-                    else:
-                        # Format the context from retrieved documents
-                        context = "\n\n".join([
-                            f"Belge {i+1} (İlgi: {doc['score']:.2f}):\n"
-                            f"Başlık: {doc['title']}\n"
-                            f"Kategori: {doc['category']}\n"
-                            f"İçerik: {doc['text']}"
-                            for i, doc in enumerate(relevant_docs)
-                        ])
-                        
-                        # Get chat history from memory
-                        chat_history = st.session_state.memory.buffer
-                        
-                        # Format the prompt
-                        formatted_prompt = prompt_template.format(
-                            question=prompt,
-                            context=context,
-                            chat_history=chat_history
-                        )
-                        
-                        # Get response from LLM
-                        response = llm_instance.invoke(formatted_prompt).content
-                
-                # Save to memory
-                st.session_state.memory.save_context(
-                    {"input": prompt},
-                    {"output": response}
-                )
+                response = chain.invoke({"query": prompt})
                 
                 st.markdown(response)
                 st.session_state.messages.append({"role": "assistant", "content": response})
