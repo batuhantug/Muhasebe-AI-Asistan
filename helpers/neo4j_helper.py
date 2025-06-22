@@ -50,10 +50,31 @@ def add_company_neo4j(tx, company):
         year=str(year),
         revenue=revenue)
 
+    # Create Relationships for law data
+def create_tax_relationship(tx, company):
+    company_type = company.get("type", "")
+    
+    if company_type.startswith("Şahıs Şirketi"):
+        law_title = "Gelir Vergisi"
+    elif company_type.startswith("Sermaye Şirketi"):
+        law_title = "Kurumlar Vergisi"
+    else:
+        return  # unknown type, skip linking
+
+    tx.run("""
+        MATCH (c:Company {name: $company_name})
+        MATCH (l:Law {title: $law_title})
+        MERGE (c)-[:VERGIYE_TABİ]->(l)
+    """, {
+        "company_name": company["name"],
+        "law_title": law_title
+    })
+
 
 def load_company_data(driver, company_data):
     with driver.session() as session:
         session.write_transaction(add_company_neo4j, company_data)
+        session.write_transaction(create_tax_relationship, company_data)
     driver.close()
 
 
