@@ -3,7 +3,7 @@ from langchain_community.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 from neo4j import GraphDatabase
-
+from openai import OpenAI
 # Define available models and their configurations
 AVAILABLE_MODELS = {
     "gpt-4o-mini": {
@@ -56,6 +56,7 @@ def llm():
     """
     openai_api_key = st.secrets["openai"]["api_key"]
     
+    return OpenAI(api_key=openai_api_key)
     
 
 def get_company_info(driver, company_name):
