@@ -70,9 +70,6 @@ graph = Neo4jGraph(
     password="your_password",
 )
 
-
-
-
 def is_database_empty(driver):
     with driver.session() as session:
         result = session.run("MATCH (d:Document) RETURN count(d) as count")
