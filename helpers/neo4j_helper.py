@@ -4,7 +4,7 @@ def add_company_neo4j(tx, company):
     # Create Company node
     query = """
     MERGE (c:Company {name: $name})
-    SET c.statu = $statu,
+    SET c.type = $type,
         c.yas = $yas,
         c.ihracat_yapiyor_mu = $ihracat_yapiyor_mu,
         c.gelir = $gelir,
@@ -12,15 +12,15 @@ def add_company_neo4j(tx, company):
         c.son_vergi_odeme_tarihi = $son_vergi_odeme_tarihi,
         c.calisan_sayisi = $calisan_sayisi
     """
-    
+
     # Add person age if company status is Gerçek Kişi
-    if company["statü"] == "Gerçek Kişi" and "kisi_yasi" in company:
+    if company["type"] == "Sermaye Şirketi" or "Şahıs Şirketi"in company:
         query = query.replace("c.calisan_sayisi = $calisan_sayisi", 
                             "c.calisan_sayisi = $calisan_sayisi, c.kisi_yasi = $kisi_yasi")
     
     tx.run(query,
     name=company["name"],
-    statu=company["statü"],
+    statu=company["type"],
     yas=company["yaş"],
     ihracat_yapiyor_mu=company["ihracat_yapiyor_mu"],
     gelir=company["gelir"],

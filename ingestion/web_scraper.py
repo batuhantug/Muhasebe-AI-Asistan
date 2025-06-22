@@ -37,40 +37,40 @@ def clean_html_tags_from_data(json_data):
         item["icerik"] = clean_text
     return json_data
 
-def create_law_graph(tx, law_title, articles, embedding_model):
+def create_law_graph(tx, law_title, provisions, embedding_model):
     
     tx.run("MERGE (law:Law {title: $law_title})", law_title=law_title)
 
-    for article in articles:
-        nid = article.get('nid')
-        baslik = article.get('baslik')
-        icerik = article.get('icerik')
-        no = article.get('no')
-        ad = article.get('ad')
-        tip = article.get('tip')
-        bolum = article.get('bolum')
+    for provision in provisions:
+        nid = provision.get('nid')
+        baslik = provision.get('baslik')
+        icerik = provision.get('icerik')
+        no = provision.get('no')
+        ad = provision.get('ad')
+        tip = provision.get('tip')
+        bolum = provision.get('bolum')
 
         # Get embedding vector using OpenAIEmbeddings
         embedding = embedding_model.embed_query(icerik)
 
         tx.run("""
             MERGE (law:Law {title: $law_title})
-            MERGE (article:Article {nid: $nid})
-            SET article.baslik = $baslik,
-                article.icerik = $icerik,
-                article.no = $no,
-                article.ad = $ad,
-                article.tip = $tip,
-                article.bolum = $bolum,
-                article.embedding = $embedding
-            MERGE (article)-[:PART_OF]->(law)
+            MERGE (provision:Provision {nid: $nid})
+            SET provision.baslik = $baslik,
+                provision.icerik = $icerik,
+                provision.no = $no,
+                provision.ad = $ad,
+                provision.tip = $tip,
+                provision.bolum = $bolum,
+                provision.embedding = $embedding
+            MERGE (provision)-[:PART_OF]->(law)
         """, law_title=law_title, nid=nid, baslik=baslik, icerik=icerik,
            no=no, ad=ad, tip=tip, bolum=bolum, embedding=embedding)
         
-def create_article_vector_index(driver, dimensions=1536, similarity_function='cosine'):
+def create_provision_vector_index(driver, dimensions=1536, similarity_function='cosine'):
     query = f"""
     CREATE VECTOR INDEX tax_law_vector_index
-    FOR (a:Article) ON (a.embedding)
+    FOR (p:Provision) ON (p.embedding)
     OPTIONS {{
         indexConfig: {{
             `vector.dimensions`: {dimensions},
@@ -81,8 +81,6 @@ def create_article_vector_index(driver, dimensions=1536, similarity_function='co
     with driver.session() as session:
         session.run(query)
         print("Vector index created for tax files.")
-
-
 
 def load_gib_data(driver, embedding_model):
     
@@ -95,4 +93,4 @@ def load_gib_data(driver, embedding_model):
         
         print("Data with embeddings imported successfully!")
     
-    create_article_vector_index(driver)
+    create_provision_vector_index(driver)
