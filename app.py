@@ -3,23 +3,25 @@ import os
 from ingestion.pdf_loader import load_data
 from ingestion.web_scraper import load_gib_data
 from helpers.neo4j_helper import load_company_data
-from helpers.llm import get_llm, determine_vector_index
+from helpers.llm import  determine_vector_index
 
 from openai import OpenAI
 from neo4j import GraphDatabase
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationChain
+from langchain_openai import ChatOpenAI
+
 import json
 from datetime import datetime
 from langchain.prompts import PromptTemplate
-from helpers.llm import check_company_eligibility
 from helpers.llm import llm
 
+
+
+from langchain_neo4j import GraphCypherQAChain
 from langchain_community.graphs import Neo4jGraph
 from langchain.chat_models import ChatOpenAI
-from langchain_community.chains import GraphCypherQAChain
-
 
 
 llm = llm()
@@ -60,15 +62,19 @@ client = OpenAI(
     api_key=openai_api_key
 ) # e.g., your OpenAI or HuggingFace client
 
+cypher_llm = ChatOpenAI(
+    temperature=0,
+    model="gpt-4o-mini",  # model set here
+    openai_api_key=openai_api_key,
+)
+
+
+graph = Neo4jGraph(url=neo4j_uri, username=neo4j_user, password=neo4j_password)
+
 embedding_model = OpenAIEmbeddings (model="text-embedding-3-small", openai_api_key=openai_api_key)
 # Initialize Neo4j driver (IMPORTANT: you forgot this part)
 driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, neo4j_password))
 
-graph = Neo4jGraph(
-    url="bolt://localhost:7687",
-    username="neo4j",
-    password="your_password",
-)
 
 def is_database_empty(driver):
     with driver.session() as session:
@@ -178,16 +184,19 @@ if prompt := st.chat_input("Bana kosgeb destekleri ve vergiler ile ilgili istedi
         with st.spinner("Thinking..."):
             
             try:
+                
                 chain = GraphCypherQAChain.from_llm(
                     graph=graph,
-                    cypher_llm=ChatOpenAI(temperature=0, model="gpt-4o-mini"),
-                    qa_llm=ChatOpenAI(temperature=0, model="gpt-4o-mini"),
+                    cypher_llm=cypher_llm,
+                    qa_llm=cypher_llm,
                     verbose=True,
-                    allow_dangerous_requests=False,  # allows queries that may modify data - use with caution
+                    allow_dangerous_requests=True,
                 )
-
-                response = chain.invoke({"query": prompt})
                 
+                response = chain.invoke({"query": prompt})
+
+                response = response.get('result')
+
                 st.markdown(response)
                 st.session_state.messages.append({"role": "assistant", "content": response})
             except Exception as e:
