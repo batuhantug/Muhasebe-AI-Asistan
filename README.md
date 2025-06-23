@@ -1,84 +1,36 @@
 # MuhasebAI - Muhasebe ve Vergi Asistanı
 
-MuhasebAI, muhasebe ve vergi konularında uzmanlaşmış bir yapay zeka asistanıdır. KOSGEB destekleri, vergi kanunları ve şirket bilgileri hakkında akıllı yanıtlar sunar.
+# Accounting AI Assistant
 
-## Özellikler
+**Accounting AI Assistant** is an intelligent, interactive tool that processes natural language queries and provides insights over accounting data. Powered by large language models (LLMs), it transforms user input into Cypher queries for a Neo4j graph database, and supports semantic understanding and conversational AI. The app is built using LangChain, Neo4j, Streamlit, and embedding-based search techniques.
 
-- 🤖 Akıllı Sohbet Arayüzü
-- 📚 KOSGEB Destekleri Bilgi Tabanı
-- 📜 Vergi Kanunları Entegrasyonu
-- 🏢 Şirket Bilgileri Yönetimi
-- 🔍 Vektör Tabanlı Arama
-- 💾 Neo4j Grafik Veritabanı Entegrasyonu
+## 🚀 Features
 
-## Kurulum
+- 🔍 **Natural Language Querying** – Ask questions in plain language, get data-driven responses.
+- 🔄 **LLM to Cypher Translation** – Converts user input into Cypher queries to interact with the Neo4j database.
+- 🤖 **Conversational Chatbot** – Chat with an AI-powered assistant using context-aware, memory-supported interactions.
+- 🧠 **Semantic Search** – Uses semantic embeddings to find and rank relevant documents or data.
+- 🧩 **Chunk-Based Embedding** – Splits long documents into smaller chunks for more effective indexing and retrieval.
+- 🕸️ **Graph-Based Data Modeling** – Models accounting data and relationships using Neo4j’s graph database engine.
+- 💻 **Streamlit Interface** – Clean, interactive frontend built with Streamlit.
 
-1. Gerekli paketleri yükleyin:
+## 🛠️ Technologies Used
+
+- **[LangChain](https://www.langchain.com/):** Framework for building LLM-powered apps
+- **[Neo4j](https://neo4j.com/):** Graph database for modeling relationships
+- **[Streamlit](https://streamlit.io/):** Python-based web app framework
+- **LLM-to-Cypher Translation:** Transforms natural language into Cypher queries via LLMs
+- **Chatbot Integration:** LLM-driven conversational agent
+- **Semantic Embedding:** Vector-based semantic understanding
+- **Chunk Embedding:** Efficient retrieval from large text segments
+
+## 📦 Installation
+
 ```bash
-pip install -r requirements.txt
-```
+git clone https://github.com/batuhantug/Muhasebe-AI-Asistan.git
+cd Muhasebe-AI-Asistan
+create streamlit/secret.toml
 
-2. Neo4j veritabanını kurun ve yapılandırın:
-   - Neo4j Desktop veya Neo4j Aura kullanabilirsiniz
-   - Vektör indekslerini oluşturun
 
-3. OpenAI API anahtarınızı ayarlayın:
-   - `.streamlit/secrets.toml` dosyasını oluşturun
-   - API anahtarınızı ekleyin:
-```toml
-[openai]
-api_key = "your-api-key"
 
-[neo4j]
-uri = "your-neo4j-uri"
-user = "your-username"
-password = "your-password"
-```
-
-## Kullanım
-
-1. Uygulamayı başlatın:
-```bash
-streamlit run app.py
-```
-
-2. Tarayıcınızda `http://localhost:8501` adresine gidin
-
-3. Özellikler:
-   - PDF Yükleme: KOSGEB ve vergi dokümanlarını yükleyin
-   - Sohbet: Muhasebe ve vergi konularında sorular sorun
-   - Şirket Yönetimi: Şirket bilgilerini ekleyin ve yönetin
-
-## Veritabanı Şeması
-
-### Node Tipleri
-- `Chunk`: KOSGEB doküman parçaları
-- `Article`: Vergi kanunu maddeleri
-- `Company`: Şirket bilgileri
-- `Sector`: Sektör bilgileri
-- `Eligibility`: KOSGEB uygunluk kriterleri
-
-### İlişkiler
-- `(Company)-[:IN_SECTOR]->(Sector)`
-- `(Company)-[:IS_ELIGIBLE_FOR]->(Eligibility)`
-
-## Vektör İndeksleri
-
-- `kosgeb_vector_index`: KOSGEB dokümanları için
-- `tax_law_vector_index`: Vergi kanunları için
-
-## Geliştirme
-
-### Yeni Özellik Ekleme
-1. İlgili modülü belirleyin
-2. Gerekli fonksiyonları ekleyin
-3. Streamlit arayüzünü güncelleyin
-4. Test edin
-
-### Veritabanı Güncelleme
-1. Neo4j sorgularını hazırlayın
-2. Vektör indekslerini güncelleyin
-3. Veri yükleme işlemlerini test edin
-
-## Katkıda Bulunma
 
