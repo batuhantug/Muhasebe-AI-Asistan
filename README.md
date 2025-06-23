@@ -16,8 +16,10 @@
 - 🧩 **Chunk-Based Embedding** – Splits long documents into smaller chunks for more effective indexing and retrieval.
 - 🕸️ **Graph-Based Data Modeling** – Models accounting data and relationships using Neo4j’s graph database engine.
 - ⚡ **Easy Data Upload** – Upload your data quickly and effortlessly via the app interface.
+
 ![data](uploaddata1.png)
 ![data](uploaddata2.png)
+
 - 💻 **Streamlit Interface** – Clean, interactive frontend built with Streamlit.
 
 ![App](muhasebai.png)
