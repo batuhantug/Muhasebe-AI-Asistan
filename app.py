@@ -3,7 +3,8 @@ import os
 from ingestion.pdf_loader import load_data
 from ingestion.web_scraper import load_gib_data
 from helpers.neo4j_helper import load_company_data
-from helpers.llm import  determine_vector_index
+from helpers.llm import llm, cypher_llm, qa_llm
+
 
 from openai import OpenAI
 from neo4j import GraphDatabase
@@ -24,26 +25,23 @@ from langchain_community.graphs import Neo4jGraph
 from langchain.chat_models import ChatOpenAI
 
 
+neo4j_uri = st.secrets["neo4j"]["uri"]
+neo4j_user = st.secrets["neo4j"]["user"]
+neo4j_password = st.secrets["neo4j"]["password"]
+
+openai_api_key = st.secrets["openai"]["api_key"]
+
+
+graph = Neo4jGraph(url=neo4j_uri, username=neo4j_user, password=neo4j_password)
+
+
+embedding_model = OpenAIEmbeddings (model="text-embedding-3-small", openai_api_key=openai_api_key)
+# Initialize Neo4j driver (IMPORTANT: you forgot this part)
+driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, neo4j_password))
+
 llm = llm()
-
-# Custom conditions for LLM responses
-CUSTOM_CONDITIONS = {
-    "default": {
-        "temperature": 0.2,
-        "max_tokens": 1000,
-        "response_style": "professional",
-        "language": "turkish"
-    }
-    # Add more conditions later
-}
-
-def get_llm_conditions(query):
-    """
-    Determine which conditions to apply based on the query.
-    This function can be expanded later with more sophisticated logic.
-    """
-    # For now, return default conditions
-    return CUSTOM_CONDITIONS["default"]
+cypher_llm = cypher_llm()
+qa_llm = qa_llm()
 
 # Initialize memory
 def initialize_memory():
@@ -52,28 +50,9 @@ def initialize_memory():
         return_messages=True
     )
 
-neo4j_uri = st.secrets["neo4j"]["uri"]
-neo4j_user = st.secrets["neo4j"]["user"]
-neo4j_password = st.secrets["neo4j"]["password"]
-
-openai_api_key = st.secrets["openai"]["api_key"]
-
-client = OpenAI(
-    api_key=openai_api_key
-) # e.g., your OpenAI or HuggingFace client
-
-cypher_llm = ChatOpenAI(
-    temperature=0,
-    model="gpt-4o-mini",  # model set here
-    openai_api_key=openai_api_key,
-)
 
 
-graph = Neo4jGraph(url=neo4j_uri, username=neo4j_user, password=neo4j_password)
 
-embedding_model = OpenAIEmbeddings (model="text-embedding-3-small", openai_api_key=openai_api_key)
-# Initialize Neo4j driver (IMPORTANT: you forgot this part)
-driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, neo4j_password))
 
 
 def is_database_empty(driver):
