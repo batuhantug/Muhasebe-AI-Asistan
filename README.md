@@ -6,6 +6,9 @@
 
 ## 🚀 Features
 
+![My Diagram](images/visualisation01.png)
+
+
 - 🔍 **Natural Language Querying** – Ask questions in plain language, get data-driven responses.
 - 🔄 **LLM to Cypher Translation** – Converts user input into Cypher queries to interact with the Neo4j database.
 - 🤖 **Conversational Chatbot** – Chat with an AI-powered assistant using context-aware, memory-supported interactions.
@@ -13,6 +16,10 @@
 - 🧩 **Chunk-Based Embedding** – Splits long documents into smaller chunks for more effective indexing and retrieval.
 - 🕸️ **Graph-Based Data Modeling** – Models accounting data and relationships using Neo4j’s graph database engine.
 - 💻 **Streamlit Interface** – Clean, interactive frontend built with Streamlit.
+
+![App](images/muhasebai.png)
+
+
 
 ## 🛠️ Technologies Used
 
