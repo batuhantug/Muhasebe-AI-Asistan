@@ -6,7 +6,7 @@
 
 ## 🚀 Features
 
-![My Diagram](images/visualisation01.png)
+![My Diagram](visualisation01.png)
 
 
 - 🔍 **Natural Language Querying** – Ask questions in plain language, get data-driven responses.
@@ -17,7 +17,7 @@
 - 🕸️ **Graph-Based Data Modeling** – Models accounting data and relationships using Neo4j’s graph database engine.
 - 💻 **Streamlit Interface** – Clean, interactive frontend built with Streamlit.
 
-![App](images/muhasebai.png)
+![App](muhasebai.png)
 
 
 
